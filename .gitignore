@@ -60,6 +60,9 @@ coverage.xml
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+fsesite/settings.py
+fsesite/urls.py
+fapi/migrations/*
 
 # Flask stuff:
 instance/
@@ -106,6 +109,7 @@ celerybeat.pid
 .venv
 env/
 venv/
+fsesenv/
 ENV/
 env.bak/
 venv.bak/
@@ -127,3 +131,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+.idea/*
