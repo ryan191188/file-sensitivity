@@ -1,11 +1,13 @@
 from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
+from django.contrib.auth import authenticate, login
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 from django.contrib.auth.models import User
 
 from .methods import validateEmail, UniqueUserEmail, UniqueUserPhone
 from .models import Profile
+from .serializers import TokenSerializer
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -126,6 +128,86 @@ class SignupView(APIView):
 				message = str(e)
 				errors.append(message)
 				res_errors.update({'user_signup': message})
+
+		return Response({
+			'data': data,
+			'result': result,
+			'errors': errors,
+			'res_errors': res_errors,
+			'message': message
+		},
+			status=response_status
+		)
+
+
+class LoginView(APIView):
+	permission_classes = (AllowAny,)
+
+	def post(self, request):
+		error = False
+		message = ''
+		data = []
+		errors = []
+		res_errors = {}
+		result = 'FAIL'
+		response_status = HTTP_400_BAD_REQUEST
+
+		name = request.POST.get('name')
+		password = request.POST.get('password')
+
+		if not name:
+			message = 'Please enter name.'
+			errors.append(message)
+			res_errors.update({'name': message})
+			error = True
+		if not password:
+			message = 'Please enter password.'
+			errors.append(message)
+			res_errors.update({'password': message})
+			error = True
+
+		if not error:
+			try:
+				user = User.objects.filter(
+					username__iexact=name
+				).order_by('-date_joined').values('username').first()
+
+				if user:
+					user = authenticate(request, username=user.get('username'), password=password)
+
+					if user.is_authenticated and user.is_active:
+						login(request, user)
+
+						serializer = TokenSerializer(data={
+							"token": jwt_encode_handler(
+								jwt_payload_handler(user)
+							)
+						})
+						# Return a 400 response if user data is invalid
+						serializer.is_valid(raise_exception=True)
+
+						data = {
+							'id_user': user.pk,
+							'email': user.email,
+							'name': user.username,
+							'token': jwt_encode_handler(
+								jwt_payload_handler(user)
+							)
+						}
+						result = 'SUCCESS'
+						message = 'User successfully logged in.'
+						response_status = HTTP_200_OK
+
+				else:
+					message = 'Invalid email or password.'
+					errors.append(message)
+					res_errors.update({'user_login': message})
+
+			except Exception as e:
+				# raise e
+				message = str(e)
+				errors.append(message)
+				res_errors.update({'user_login': message})
 
 		return Response({
 			'data': data,
