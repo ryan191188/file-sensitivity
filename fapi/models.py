@@ -20,3 +20,19 @@ class Upload(models.Model):
     ses_score = models.IntegerField(default=0)
     created_date = models.DateTimeField(default=timezone.now)
     modified_date = models.DateTimeField(auto_now=True)
+
+    def __init__(self, *args, **kwargs):
+        super(Upload, self).__init__(*args, **kwargs)
+        self.__ses_score = self.ses_score
+
+    def save(self, *args, **kwargs):
+        if self.ses_score > self.__ses_score:
+            self.modified_date = timezone.now()
+        super(Upload, self).save(*args, **kwargs)
+
+
+class WordSensitivity(models.Model):
+    id_word_ses = models.AutoField(primary_key=True)
+    sensitive_word = models.CharField(max_length=255, blank=True, null=True)
+    score = models.IntegerField(default=0)
+    created_date = models.DateTimeField(default=timezone.now)

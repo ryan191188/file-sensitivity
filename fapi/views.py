@@ -3,7 +3,9 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
+from datetime import datetime
 from django.contrib.auth.models import User
+from django.db.models import Q
 
 from .methods import validateEmail, UniqueUserEmail, UniqueUserPhone, validate_text_file, upload_file
 from .models import Profile, Upload
@@ -274,6 +276,148 @@ class FileUpload(APIView):
 			'result': result,
 			'errors': errors,
 			'res_errors': res_errors,
+			'message': message
+		},
+			status=response_status
+		)
+
+
+class MyFile(APIView):
+	def post(self, request):
+		error = False
+		message = ''
+		data = []
+		errors = []
+		res_errors = {}
+		result = 'FAIL'
+		response_status = HTTP_400_BAD_REQUEST
+
+		upload_date = request.POST.get('upload_date')
+		from_date = request.POST.get('from_date')
+		to_date = request.POST.get('to_date')
+		file_name = request.POST.get('file_name')
+		size_category = request.POST.get('size_category')  # file_size
+		ses_sort = request.POST.get('ses_sort')  # ses score
+		page = request.POST.get('page')
+
+		if page is None:
+			message = 'Page is missing'
+			errors.append(message)
+			res_errors.update({'file_pagination': message})
+			error = True
+
+		if file_name and '.txt' not in file_name:
+			message = 'Pls add txt extension'
+			errors.append(message)
+			res_errors.update({'file_name': message})
+			error = True
+
+		if size_category and size_category.lower() not in ('small', 'medium', 'large'):
+			message = 'Invalid File Size Category'
+			errors.append(message)
+			res_errors.update({'file_size': message})
+			error = True
+
+		if from_date and not to_date:
+			message = 'End Date is missing'
+			errors.append(message)
+			res_errors.update({'file_filter': message})
+			error = True
+
+		if to_date and not from_date:
+			message = 'Start Date is missing'
+			errors.append(message)
+			res_errors.update({'file_filter': message})
+			error = True
+
+		if not error:
+			try:
+				page = int(request.POST['page'])
+
+				if page > 1:
+					# 10 files per page
+					page = (page - 1) * 10
+				else:
+					page = 0
+
+				qs = Upload.objects.filter(
+					user=request.user
+				)
+
+				if file_name:
+					qs = qs.filter(
+						Q(file_name__icontains=file_name) |
+						Q(file_path__icontains=file_name)
+					)
+
+				small_size = 5 * 1024
+				medium_size = 5 * 1024 * 1024
+
+				if size_category == 'small':
+					qs = qs.filter(file_size__lt=small_size)
+				elif size_category == 'medium':
+					qs = qs.filter(file_size__range=(small_size, medium_size))
+				elif size_category == 'large':
+					qs = qs.filter(file_size__gt=medium_size)
+
+				if upload_date:
+					upload_start_date = datetime.strptime(
+						upload_date + " 00:00:00", "%Y-%m-%d %H:%M:%S"
+					)
+					upload_end_date = datetime.strptime(
+						upload_date + " 23:59:59", "%Y-%m-%d %H:%M:%S"
+					)
+
+					qs = qs.filter(created_date__range=[upload_start_date, upload_end_date])
+
+				if from_date and to_date:
+					upload_start_date = datetime.strptime(
+						from_date + " 00:00:00", "%Y-%m-%d %H:%M:%S"
+					)
+					upload_end_date = datetime.strptime(
+						to_date + " 23:59:59", "%Y-%m-%d %H:%M:%S"
+					)
+
+					qs = qs.filter(created_date__range=[upload_start_date, upload_end_date])
+
+				if ses_sort == '1':
+					qs = qs.order_by('-ses_score')
+				else:
+					qs = qs.order_by('-modified_date')
+
+				data = qs.values(
+					'id_file_upload',
+					'modified_date',
+					'file_name',
+					'file_size',
+					'ses_score'
+				)[page:(page + 10)]
+
+				if len(data) > 0:
+					for o in data:
+						o['last_modified'] = str(
+							timezone.localtime(o['modified_date']).strftime("%d-%m-%Y")) + ' ' \
+							+ str(timezone.localtime(o['modified_date']).strftime("%I:%M %p"))
+
+						o['file_size'] = str(o['file_size']) + ' B'
+
+					message = 'Files successfully listed.'
+					result = 'SUCCESS'
+					response_status = HTTP_200_OK
+				else:
+					message = 'No files found.'
+					result = 'SUCCESS'
+					response_status = HTTP_200_OK
+
+			except Exception as e:
+				message = str(e)
+				errors.append(message)
+				res_errors.update({'file_listing': message})
+
+		return Response({
+			'data': data,
+			'result': result,
+			'errors': errors,
 			'message': message
 		},
 			status=response_status
