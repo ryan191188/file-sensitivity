@@ -63,6 +63,7 @@ db.sqlite3-journal
 fsesite/settings.py
 fsesite/urls.py
 fapi/migrations/*
+media/
 
 # Flask stuff:
 instance/

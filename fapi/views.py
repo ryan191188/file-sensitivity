@@ -5,8 +5,8 @@ from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 from django.contrib.auth.models import User
 
-from .methods import validateEmail, UniqueUserEmail, UniqueUserPhone
-from .models import Profile
+from .methods import validateEmail, UniqueUserEmail, UniqueUserPhone, validate_text_file, upload_file
+from .models import Profile, Upload
 from .serializers import TokenSerializer
 
 from rest_framework.views import APIView
@@ -197,7 +197,6 @@ class LoginView(APIView):
 						result = 'SUCCESS'
 						message = 'User successfully logged in.'
 						response_status = HTTP_200_OK
-
 				else:
 					message = 'Invalid email or password.'
 					errors.append(message)
@@ -208,6 +207,67 @@ class LoginView(APIView):
 				message = str(e)
 				errors.append(message)
 				res_errors.update({'user_login': message})
+
+		return Response({
+			'data': data,
+			'result': result,
+			'errors': errors,
+			'res_errors': res_errors,
+			'message': message
+		},
+			status=response_status
+		)
+
+
+class FileUpload(APIView):
+	def post(self, request):
+		error = False
+		message = ''
+		data = []
+		errors = []
+		res_errors = {}
+		result = 'FAIL'
+		response_status = HTTP_400_BAD_REQUEST
+
+		text_file = request.FILES.get('text_file')
+
+		if text_file is None:
+			message = 'Please upload file.'
+			errors.append(message)
+			res_errors.update({'file': message})
+			error = True
+		elif not validate_text_file(text_file):
+			message = 'Incorrect file extension not matching .txt'
+			errors.append(message)
+			res_errors.update({'file_ext': message})
+			error = True
+
+		if not error:
+			try:
+				if text_file is not None:
+					err_status, upload_url = upload_file(text_file)
+					if err_status:
+						message = 'Error in uploading file.'
+						errors.append(message)
+						res_errors.update({'file_upload': message})
+					else:
+						file_upload = Upload(
+							file_name=text_file.name,
+							file_path=upload_url,
+							file_size=text_file.size,
+							user=request.user
+						)
+						file_upload.save()
+
+						result = 'SUCCESS'
+						message = 'File successfully uploaded'
+						response_status = HTTP_200_OK
+
+			except Exception as e:
+				# raise e
+				message = str(e)
+				errors.append(message)
+				res_errors.update({'file_upload': message})
 
 		return Response({
 			'data': data,
