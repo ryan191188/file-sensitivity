@@ -79,7 +79,7 @@ def upload_file(file, delete_later=True):
 	return error, file_url
 
 
-def calculate_ses_score(file):
+def calculate_ses(file):
 	ses_score = 0
 
 	if not isinstance(file, str):

@@ -64,6 +64,8 @@ fsesite/settings.py
 fsesite/urls.py
 fapi/migrations/*
 media/
+gunicorn.sock
+secret_key.txt
 
 # Flask stuff:
 instance/
