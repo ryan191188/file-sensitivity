@@ -159,3 +159,10 @@ Setup RabbitMQ server with Celery
 - Manual Installation of erlang and rabbitmq
 - check port 5672 open
 - Daemonize celeryd / celerybeat (periodic)
+- Under fsesite/celery.py, add below
+```
+app = Celery('fsesite')
+app.config_from_object('django.conf:settings')
+app.conf.BROKER_URL = "amqp://user:password@domain:5672"
+app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)
+```
